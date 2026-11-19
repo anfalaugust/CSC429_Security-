@@ -2,25 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Dashboard</h1>
+    <main class="card">
+        <div class="logo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#18181B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="8" r="4"></circle>
+                <path d="M4 21a8 8 0 0 1 16 0"></path>
+            </svg>
+        </div>
 
-    
-    <p>Welcome, <strong>{{ user.username }}</strong>!</p>
+        <!-- All values are auto-escaped by Jinja2 -->
+        <h1>Welcome, {{ user.username }}</h1>
+        <p class="subtitle">Your profile details</p>
 
-    <h2>Profile Details</h2>
-    <ul>
-        <li>Username: {{ user.username }}</li>
-        <li>Role: {{ user.role }}</li>
-        <li>Account created: {{ user.created_at }}</li>
-    </ul>
+        <ul class="details">
+            <li><span>Username</span> {{ user.username }}</li>
+            <li><span>Role</span> <strong class="badge">{{ user.role }}</strong></li>
+            <li><span>Account created</span> {{ user.created_at }}</li>
+        </ul>
 
-    <!-- Comments section: added by Student 3 -->
-    <!-- Admin page link: added by Student 3 -->
+        <!-- Comments section: added by Student 3 -->
+        <!-- Admin page link: added by Student 3 -->
 
-    <!-- Logout route is implemented by Student 4 -->
-    <p><a href="/logout">Logout</a></p>
+        <!-- Logout route is implemented by Student 4 -->
+        <a class="button button-secondary" href="/logout">Logout</a>
+    </main>
 </body>
 </html>
