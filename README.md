@@ -59,6 +59,8 @@ SecurityWebApp/
 |
 |-- legacy_register_demo.py
 |-- legacy_sqli_demo.py
+|-- legacy_xss_demo.py
+|-- legacy_rbac_demo.py
 |-- password_demo.py
 |-- storage_demo.py
 |-- test_db.py
@@ -350,6 +352,71 @@ The following tests were performed locally by the team:
 | Change the test account role back to `user` | Access to `/admin` is denied with HTTP 403 | Passed |
 
 The role-change tests were performed using the local MySQL database. The application retrieves the user's current role from the database when checking access to the admin page.
+
+### 8.7 Isolated XSS Before-and-After Demonstration
+
+The project includes an isolated demonstration in `legacy_xss_demo.py` to compare vulnerable and secure comment rendering.
+
+Run the demonstration:
+
+```powershell
+.\.venv\Scripts\python.exe legacy_xss_demo.py
+```
+
+Open:
+
+`http://127.0.0.1:5003`
+
+The demonstration provides two versions:
+
+- **Before – Vulnerable Comments:** Uses unsafe HTML rendering (`|safe`), allowing submitted JavaScript to execute.
+- **After – Secure Comments:** Uses HTML escaping to display submitted content as text instead of executing it.
+
+**Test payload:**
+
+```html
+<script>alert('XSS Attack')</script>
+```
+
+**Observed results:**
+- Vulnerable version: The JavaScript executed and displayed an alert dialog.
+- Secure version: The payload appeared as visible text, and no alert dialog appeared.
+
+This demonstration shows how HTML escaping prevents stored XSS when displaying user-generated content.
+
+### 8.8 Isolated RBAC Before-and-After Demonstration
+
+The project includes an isolated demonstration in `legacy_rbac_demo.py` to show the importance of server-side authorization.
+
+Run the demonstration:
+
+```powershell
+.\.venv\Scripts\python.exe legacy_rbac_demo.py
+```
+
+Open:
+
+`http://127.0.0.1:5004`
+
+The demonstration provides two user accounts:
+
+- `demo_user`: Standard user.
+- `demo_admin`: Administrator.
+
+It also provides two administrator routes:
+
+- **Before – `/vulnerable/admin`:** No role verification is performed, allowing a standard user to access the administrator page.
+- **After – `/secure/admin`:** Checks the authenticated user's role and allows access only to administrators.
+
+**Observed test results:**
+
+| Test | Expected result | Observed result |
+|---|---|---|
+| Standard user accesses `/vulnerable/admin` | Access allowed due to missing authorization | Passed |
+| Standard user accesses `/secure/admin` | HTTP 403 Forbidden | Passed |
+| Administrator accesses `/secure/admin` | Access allowed | Passed |
+
+These isolated demonstrations use local test accounts and are intended for educational purposes only. They do not modify the main application's MySQL database.
 
 ## 9. Logout, HTTPS/TLS, and Encryption 
 
