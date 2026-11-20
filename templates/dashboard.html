@@ -25,11 +25,17 @@
             <li><span>Account created</span> {{ user.created_at }}</li>
         </ul>
 
-        <!-- Comments section: added by Student 3 -->
-        <!-- Admin page link: added by Student 3 -->
+        <!-- Page links -->
+        <a class="button" href="{{ url_for('comments') }}">Comments</a>
+        {% if user.role == 'admin' %}
+            <!-- Link is only hidden for normal users; /admin is still protected on the server by @admin_required -->
+            <a class="button" href="{{ url_for('admin') }}">Admin Page</a>
+        {% endif %}
 
-        <!-- Logout route is implemented by Student 4 -->
-        <a class="button button-secondary" href="/logout">Logout</a>
+        <!-- Logout route -->
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit" class="button button-secondary">Logout</button>
+        </form>
     </main>
 </body>
 </html>

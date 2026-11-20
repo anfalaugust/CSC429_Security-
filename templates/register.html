@@ -19,6 +19,11 @@
         <h1>Create an Account</h1>
         <p class="subtitle">Fill in the details below to register.</p>
 
+        {% if error %}
+            <!-- Jinja2 auto-escapes this value, so it is safe to display -->
+            <p class="error">{{ error }}</p>
+        {% endif %}
+        
         <form action="/register" method="POST">
 
             <label for="username">Username</label>

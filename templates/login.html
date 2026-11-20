@@ -18,6 +18,10 @@
         <h1>Login</h1>
         <p class="subtitle">Enter your username and password to log in.</p>
 
+        {% if message %}
+            <p class="success">{{ message }}</p>
+        {% endif %}
+
         {% if error %}
             <!-- Jinja2 auto-escapes this value, so it is safe to display -->
             <p class="error">{{ error }}</p>
