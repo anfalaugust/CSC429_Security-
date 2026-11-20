@@ -330,9 +330,9 @@ The following tests were performed locally by the team:
 | Submit the XSS test payload | Payload is displayed as text; script is not executed | Passed |
 | Standard user opens `/admin` directly | Access is denied with HTTP 403 | Passed |
 | Administrator opens `/admin` | Admin dashboard is displayed | Passed |
-| Change the test account back to `user` and start a fresh login session | Access to `/admin` is denied with HTTP 403 | Passed |
+| Change the test account role back to `user` | Access to `/admin` is denied with HTTP 403 | Passed |
 
-The role-change tests were performed using the local MySQL database. A fresh login session was used after changing the role so that the application would load the updated role.
+The role-change tests were performed using the local MySQL database. The application retrieves the user's current role from the database when checking access to the admin page.
 
 ## 9. Logout, HTTPS/TLS, and Encryption (Student 4)
 
