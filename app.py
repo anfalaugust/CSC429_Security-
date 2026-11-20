@@ -4,7 +4,7 @@ import bcrypt
 import pymysql
 import string
 
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, session, redirect, url_for, abort 
 from db import get_db_connection
 
 # Initialize Flask application
@@ -144,6 +144,46 @@ def login_required(view):
     return wrapped_view
 
 
+def admin_required(view):
+    """Allow access only when the current database record has the admin role.
+
+    The role is reloaded from MySQL instead of trusting the role value in the
+    client-side signed session. This prevents a stale session from retaining
+    admin access after an administrator's role has been changed.
+    """
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+
+        connection = None
+        try:
+            connection = get_db_connection()
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT role FROM users WHERE id = %s",
+                    (session["user_id"],)
+                )
+                current_user = cursor.fetchone()
+        except pymysql.MySQLError:
+            return "Could not verify permissions. Please try again.", 500
+        finally:
+            if connection:
+                connection.close()
+
+        if not current_user:
+            session.clear()
+            return redirect(url_for("login"))
+
+        if current_user["role"] != "admin":
+            abort(403)
+
+        # Keep the session role in sync for display purposes only.
+        session["role"] = current_user["role"]
+        return view(*args, **kwargs)
+    return wrapped_view
+
+
 # User login page
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -247,6 +287,94 @@ def dashboard():
         return redirect(url_for("login"))
 
     return render_template("dashboard.html", user=user)
+
+
+# Comments feature and XSS protection (Student 3)
+@app.route("/comments", methods=["GET", "POST"])
+@login_required
+def comments():
+    """Let signed-in users post plain-text comments and read the discussion.
+
+    Comment content is stored as text, never marked safe as HTML. Jinja2's
+    automatic HTML escaping is enabled in the template when values are shown.
+    """
+    if request.method == "POST":
+        comment_text = request.form.get("comment", "").strip()
+
+        # Remove NUL characters and reject empty/oversized comments.
+        comment_text = comment_text.replace("\x00", "")
+        if not comment_text:
+            return render_template(
+                "comments.html", comments=[], error="Please enter a comment."
+            ), 400
+        if len(comment_text) > 1000:
+            return render_template(
+                "comments.html", comments=[],
+                error="Comments must be 1000 characters or fewer."
+            ), 400
+
+        connection = None
+        try:
+            connection = get_db_connection()
+            with connection.cursor() as cursor:
+                # Parameterized SQL keeps comment text separate from the query.
+                cursor.execute(
+                    "INSERT INTO comments (user_id, comment_text) VALUES (%s, %s)",
+                    (session["user_id"], comment_text)
+                )
+            connection.commit()
+        except pymysql.MySQLError:
+            if connection:
+                connection.rollback()
+            return "Could not save your comment. Please try again.", 500
+        finally:
+            if connection:
+                connection.close()
+
+        return redirect(url_for("comments"))
+
+    connection = None
+    comment_rows = []
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT comments.id, comments.comment_text,
+                          comments.created_at, users.username
+                   FROM comments
+                   JOIN users ON users.id = comments.user_id
+                   ORDER BY comments.created_at DESC, comments.id DESC"""
+            )
+            comment_rows = cursor.fetchall()
+    except pymysql.MySQLError:
+        return "Could not load comments. Please try again.", 500
+    finally:
+        if connection:
+            connection.close()
+
+    return render_template("comments.html", comments=comment_rows)
+
+
+# Admin-only user management page (Student 3)
+@app.route("/admin")
+@admin_required
+def admin():
+    connection = None
+    users = []
+    try:
+        connection = get_db_connection()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, username, role, created_at FROM users ORDER BY id ASC"
+            )
+            users = cursor.fetchall()
+    except pymysql.MySQLError:
+        return "Could not load user management. Please try again.", 500
+    finally:
+        if connection:
+            connection.close()
+
+    return render_template("admin.html", users=users)
 
 
 # Run locally with debug mode disabled
