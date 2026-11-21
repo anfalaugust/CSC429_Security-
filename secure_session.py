@@ -1,4 +1,12 @@
+"""
+Encrypted session cookies (Fernet).
 
+Flask's default session cookie is only signed, not encrypted: anyone who gets
+the cookie can base64-decode it and read the user ID, username and role.
+This module replaces the cookie serializer with Fernet from the `cryptography`
+library, which encrypts the data (AES) and detects any change (HMAC-SHA256).
+We used a well-tested library instead of writing our own encryption code.
+"""
 import json
 
 from cryptography.fernet import Fernet, InvalidToken

@@ -130,8 +130,13 @@ def register():
     if password != confirm_password:
         return render_template("register.html", error="Passwords do not match."), 400
 
-    # Secure password hashing using bcrypt
-    # A unique random salt is generated for each password
+        # Why bcrypt instead of MD5:
+    # - MD5 is very fast, so an attacker with a stolen database can test billions
+    #   of guesses per second. bcrypt is slow on purpose (default cost factor 12),
+    #   which makes offline password guessing much harder.
+    # - bcrypt.gensalt() creates a unique random salt for every password, so two
+    #   users with the same password get different hashes and precomputed
+    #   (rainbow) tables are useless.
     hashed_password = bcrypt.hashpw(
         password.encode("utf-8"),
         bcrypt.gensalt()
@@ -479,7 +484,10 @@ if __name__ == "__main__":
     if not (os.path.exists(cert_file) and os.path.exists(key_file)):
         raise RuntimeError("TLS certificate not found. Run: python generate_cert.py")
 
-    # Accept TLS 1.2 or newer only; older SSL/TLS versions are insecure
+    # Secure communication: HTTPS encrypts everything sent between the browser
+    # and the server (passwords, session cookie), so an attacker on the same
+    # network cannot read or modify it.
+    # Accept TLS 1.2 or newer only; SSL and TLS 1.0/1.1 have known weaknesses.
     tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
     tls_context.load_cert_chain(cert_file, key_file)

@@ -1,4 +1,12 @@
+"""
+Creates a self-signed TLS certificate for running the app over HTTPS locally.
 
+- RSA 2048-bit key and SHA-256 signature: current minimum recommended strength.
+- Valid for localhost and 127.0.0.1 only, for 365 days.
+- The files are saved in certs/, which is listed in .gitignore so the private
+  key is never uploaded to GitHub.
+In production, a certificate from a trusted CA (e.g. Let's Encrypt) is used instead.
+"""
 import datetime
 import ipaddress
 import os
