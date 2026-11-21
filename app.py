@@ -27,6 +27,7 @@ if not SESSION_ENCRYPTION_KEY:
         "python -c \"from cryptography.fernet import Fernet; "
         "print(Fernet.generate_key().decode())\""
     )
+
 app.session_interface = EncryptedCookieSessionInterface(SESSION_ENCRYPTION_KEY)
 
 app.config.update(
@@ -62,7 +63,6 @@ def add_security_headers(response):
     - Cache-Control no-store on protected pages: the browser keeps no copy of
       them, so pressing Back after logout re-requests the page from the server,
       and the server redirects to /login because the session is gone.
-    - HSTS: tells the browser to use HTTPS only for this site from now on.
     """
     if request.path.startswith(PROTECTED_PATHS) or "user_id" in session:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

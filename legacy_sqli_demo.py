@@ -260,4 +260,4 @@ def users():
 
 if __name__ == "__main__":
     # Local demonstration only - never deploy this file
-    app.run(host="127.0.0.1", port=5002, debug=False, threaded=False)
+    app.run(host="127.0.0.1", port=5002, debug=False, threaded=True)

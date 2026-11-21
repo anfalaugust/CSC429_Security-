@@ -25,6 +25,7 @@ The security features implemented or documented in this repository include:
 - MySQL
 - MySQL Workbench
 - PyMySQL
+- Jinja2 (Flask templates with automatic HTML escaping)
 - bcrypt
 - python-dotenv
 - cryptography (Fernet session encryption, TLS certificate generation)
@@ -61,12 +62,23 @@ SecurityWebApp/
 |-- legacy_sqli_demo.py
 |-- legacy_xss_demo.py
 |-- legacy_rbac_demo.py
+|-- legacy_session_demo.py
 |-- password_demo.py
 |-- storage_demo.py
 |-- test_db.py
 ```
 
-The exact template and static-file names may vary slightly depending on the latest team integration.
+### Isolated vulnerability demonstrations
+
+Each "before" (vulnerable) version runs as a separate local app with dummy data, so the main application and its MySQL database are never affected:
+
+| File | Port | Demonstrates |
+|---|---|---|
+| `legacy_register_demo.py` | 5001 | Weak password storage (MD5) |
+| `legacy_sqli_demo.py` | 5002 | SQL injection (vulnerable vs. secure login/registration) |
+| `legacy_xss_demo.py` | 5003 | Stored XSS (vulnerable vs. secure comments) |
+| `legacy_rbac_demo.py` | 5004 | Broken access control (vulnerable vs. secure admin page) |
+| `legacy_session_demo.py` | 5005 | Unencrypted HTTP, readable session cookie, missing logout |
 
 ## 4. Installation and Setup
 
@@ -140,6 +152,12 @@ The exact template and static-file names may vary slightly depending on the late
     `https://127.0.0.1:5000/register`
 
     The browser shows a warning because the certificate is self-signed. Click **Advanced → Proceed to 127.0.0.1** (local testing only).
+
+    Optional: to remove the warning on Windows, trust the local certificate for your user account:
+
+    ```powershell
+    certutil -addstore -user Root certs\cert.pem
+    ```
 
 > **Important:** Never commit `.env` or share real database credentials or secret keys. Only `.env.example` should be committed.
 
@@ -223,7 +241,7 @@ The login and dashboard implementation includes:
 - A dashboard displaying the username, role, and account creation date
 - A reusable `@login_required` decorator to protect authenticated pages
 
-The dashboard should redirect unauthenticated users to the login page.
+Unauthenticated users who open the dashboard are redirected to the login page.
 
 ### SQL Injection Demonstration
 
@@ -254,7 +272,17 @@ Each page shows the SQL query sent to the database.
 
 #### Test 2: Creating an administrator account through vulnerable registration
 
-Use only the isolated local demonstration and the dummy values documented in the original project instructions. Do not attempt this against a real or shared database.
+1. Open `/vulnerable/register`.
+2. Enter the following username and any password:
+
+   ```text
+   hacker', '5f4dcc3b5aa765d61d8327deb882cf99', 'admin') --
+   ```
+
+3. Open `/users`: a new account `hacker` appears with the `admin` role.
+4. Repeat the test on `/secure/register`: the whole input is saved as a plain username with the `user` role.
+
+Use only the isolated local demonstration. Do not attempt this against a real or shared database.
 
 The vulnerable registration demonstrates how unsafe SQL construction can allow an attacker to manipulate inserted values. The secure registration should treat the submitted value as data and assign the normal user role.
 
@@ -262,7 +290,7 @@ The vulnerable registration demonstrates how unsafe SQL construction can allow a
 
 Try the SQL injection login input against the main application's login page. The expected result is that authentication is not bypassed and the application displays an invalid-credentials message.
 
-## 8. Comments, XSS Prevention, and Role-Based Access Control 
+## 8. Comments, XSS Prevention, and Role-Based Access Control
 
 ### 8.1 Comments Feature
 
@@ -418,7 +446,21 @@ It also provides two administrator routes:
 
 These isolated demonstrations use local test accounts and are intended for educational purposes only. They do not modify the main application's MySQL database.
 
-## 9. Logout, HTTPS/TLS, and Encryption 
+## 9. Logout, HTTPS/TLS, and Encryption
+
+### 9.0 Isolated Before demonstration
+
+The vulnerable state is isolated in `legacy_session_demo.py`. It runs over plain HTTP with one dummy account and does not touch the MySQL database:
+
+```powershell
+.\.venv\Scripts\python.exe legacy_session_demo.py
+```
+
+Open `http://127.0.0.1:5005` and log in with the account shown on the page (password `DemoPass123!`).
+
+- **Plain HTTP:** the browser reports that the connection is not secure.
+- **Readable cookie:** click **Inspect my session cookie**. The page decodes Flask's default (signed, not encrypted) cookie without the secret key and shows the username and role.
+- **No logout:** click **Logout** → `404 Not Found`, so the session cannot be ended.
 
 ### 9.1 Logout and session termination
 
@@ -440,9 +482,9 @@ Each login creates a new random `sid` (`secrets.token_urlsafe(32)`). Before ever
 
 - `generate_cert.py` creates a self-signed certificate (RSA 2048, SHA-256, valid for 365 days) in `certs/`. The `certs/` folder is listed in `.gitignore`, so the private key is never committed.
 - `app.py` runs Flask with an `ssl.SSLContext` that accepts **TLS 1.2 or newer** only (TLS 1.0/1.1 are rejected).
-- `Strict-Transport-Security` (HSTS) tells the browser to use HTTPS only for this site.
+- `Strict-Transport-Security` (HSTS) is sent over HTTPS. In a real deployment with a domain name and a trusted certificate, it tells the browser to use HTTPS only; browsers ignore it for local IP addresses and self-signed certificates.
 - Extra headers: `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` (prevents clickjacking).
-- The browser shows "Not secure" because the certificate is self-signed for local testing. The connection is still encrypted (TLS 1.3, visible in DevTools → Security). In production, a certificate from a trusted CA (e.g. Let's Encrypt) would be used.
+- Because the certificate is self-signed, the browser shows "Not secure" until the certificate is trusted locally (see Installation step 12). The connection is encrypted either way (TLS 1.3 with AES_256_GCM, visible in DevTools → Security). In production, a certificate from a trusted CA (e.g. Let's Encrypt) would be used.
 
 ### 9.4 Encrypted and secure session cookies
 
@@ -454,10 +496,10 @@ Cookie flags configured in `app.py`:
 |---|---|---|
 | `Secure` | True | Cookie is sent over HTTPS only |
 | `HttpOnly` | True | JavaScript cannot read the cookie (reduces XSS impact) |
-| `SameSite` | Lax | Cookie is not sent with cross-site POST requests (reduces CSRF) |
-| Lifetime | 30 minutes | Session expires automatically; Fernet also rejects older tokens |
+| `SameSite` | Lax | Cookie is not sent with cross-site POST or embedded requests (reduces CSRF) |
+| Lifetime | 30 minutes | Session expires after 30 minutes of inactivity; Fernet also rejects older tokens |
 
-### 9.5 How to test 
+### 9.5 How to test
 
 1. **HTTPS:** open `https://127.0.0.1:5000/login` and press `F12` → **Security**: the connection uses TLS. Opening `http://127.0.0.1:5000/login` (without the s) does not work.
 2. **Encrypted cookie:** log in, press `F12` → **Application** → **Cookies** → `session`. The value starts with `gAAAAA` (Fernet token); the username is not readable. The columns show `Secure` ✓, `HttpOnly` ✓, `SameSite = Lax`.
@@ -466,7 +508,9 @@ Cookie flags configured in `app.py`:
 5. **Direct URL:** after logout, type `https://127.0.0.1:5000/dashboard` → redirected to `/login`.
 6. **Tampered cookie:** edit a few characters of the cookie value in DevTools and refresh → the session is rejected and you are redirected to `/login`.
 
-### 9.6 Security testing results 
+### 9.6 Security testing results
+
+The TLS 1.1, copied-cookie and modified-cookie tests were also run as automated tests against the application code.
 
 | Test | Expected secure result | Observed result |
 |---|---|---|
@@ -480,7 +524,7 @@ Cookie flags configured in `app.py`:
 | Reuse a copied cookie after logout | Rejected, redirect to `/login` | Passed |
 | Modify the cookie value | Rejected, redirect to `/login` | Passed |
 
-### 9.7 Page integration 
+### 9.7 Page integration
 
 The pages were connected into one flow:
 
@@ -506,20 +550,38 @@ The pages were connected into one flow:
 
 ## 11. Conclusion
 
-This project built a Flask and MySQL user-management application and showed how common web vulnerabilities appear and how they are fixed. MD5 password storage was replaced with salted bcrypt hashing and enforced password rules. SQL injection in login and registration was removed with parameterized queries. Stored XSS in comments was prevented with HTML escaping. Broken access control was fixed with server-side role-based access control. Finally, all traffic is protected with HTTPS/TLS, the session cookie is encrypted and marked `Secure`/`HttpOnly`/`SameSite`, and logout fully ends the session, including on the server, so the Back button or a direct URL cannot restore access.
+This project developed a user management web application using Python, Flask and MySQL to demonstrate five common web security vulnerabilities and their mitigations. For each one, we built an isolated vulnerable demo, showed how it could be attacked, and then applied and tested the fix in the main application.
 
-The main lesson is that security needs several layers working together: one control is never enough. A production deployment would also need a certificate from a trusted authority (e.g. Let's Encrypt), a production WSGI server instead of the Flask development server, CSRF tokens on forms, and a shared session store (e.g. Redis) instead of in-memory session revocation.
+SQL injection was prevented with parameterized queries, and weak MD5 password storage was replaced with salted bcrypt hashing and server-side password rules. Cross-Site Scripting was prevented by escaping user content when it is displayed, and broken access control was fixed with server-side role checks that return HTTP 403 Forbidden to standard users. Finally, data is now protected by HTTPS with TLS 1.2 or newer, an encrypted and secured session cookie, and a logout that ends the session on the server. All tests in the security testing tables produced the expected secure result.
+
+The main lesson is that security needs several layers working together, and that the best fixes address the root cause instead of filtering input. A real deployment would also need a trusted certificate, a production web server, CSRF tokens, and a shared session store such as Redis.
 
 ## 12. References
 
-1. OWASP Top 10 (2021). https://owasp.org/Top10/
-2. OWASP Session Management Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-3. OWASP Transport Layer Security Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html
-4. OWASP SQL Injection Prevention Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
-5. OWASP Cross Site Scripting Prevention Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
-6. OWASP Password Storage Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
-7. Flask documentation – Sessions and security considerations. https://flask.palletsprojects.com/en/stable/web-security/
-8. cryptography library – Fernet (symmetric encryption). https://cryptography.io/en/latest/fernet/
-9. Python documentation – `ssl` module. https://docs.python.org/3/library/ssl.html
-10. MDN Web Docs – Set-Cookie and Cache-Control headers. https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers
-11. bcrypt library for Python. https://pypi.org/project/bcrypt/
+[1] OWASP Foundation. "OWASP Top 10:2025." OWASP. Accessed: Nov. 21, 2026. [Online]. Available: https://owasp.org/Top10/2025/
+
+[2] OWASP Foundation. "SQL Injection Prevention Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
+
+[3] OWASP Foundation. "Password Storage Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+
+[4] Python Cryptographic Authority. "bcrypt." Python Package Index (PyPI). Accessed: Nov. 21, 2026. [Online]. Available: https://pypi.org/project/bcrypt/
+
+[5] OWASP Foundation. "Cross Site Scripting Prevention Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+
+[6] OWASP Foundation. "Authorization Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+
+[7] E. Rescorla, "The Transport Layer Security (TLS) Protocol Version 1.3," Internet Engineering Task Force, RFC 8446, Aug. 2018. [Online]. Available: https://www.rfc-editor.org/rfc/rfc8446
+
+[8] OWASP Foundation. "Transport Layer Security Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html
+
+[9] Python Cryptographic Authority. "Fernet (symmetric encryption)." Cryptography Documentation. Accessed: Nov. 21, 2026. [Online]. Available: https://cryptography.io/en/latest/fernet/
+
+[10] Pallets Projects. "Security Considerations." Flask Documentation. Accessed: Nov. 21, 2026. [Online]. Available: https://flask.palletsprojects.com/en/stable/web-security/
+
+[11] OWASP Foundation. "Session Management Cheat Sheet." OWASP Cheat Sheet Series. Accessed: Nov. 21, 2026. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
+
+[12] Mozilla. "Cache-Control header." MDN Web Docs. Accessed: Nov. 21, 2026. [Online]. Available: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+
+[13] PyMySQL Contributors. "PyMySQL Documentation." Read the Docs. Accessed: Nov. 21, 2026. [Online]. Available: https://pymysql.readthedocs.io/
+
+[14] Pallets Projects. "Template Designer Documentation: HTML Escaping." Jinja Documentation. Accessed: Nov. 21, 2026. [Online]. Available: https://jinja.palletsprojects.com/en/stable/templates/#html-escaping
