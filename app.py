@@ -181,6 +181,7 @@ def login():
                 """,
                 (username,)
             )
+            
             user = cursor.fetchone()
 
     except pymysql.MySQLError:

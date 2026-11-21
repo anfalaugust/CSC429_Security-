@@ -1,5 +1,5 @@
 """
-SQL Injection Bfore and after demonstration.
+SQL Injection Before / After demonstration
 """
 
 import hashlib
@@ -21,7 +21,7 @@ db.execute("""
 
 
 def md5(text):
-    # same weak hashing used in the "before" password demo
+    # Demo only: same weak hashing used in the "before" password demo
     return hashlib.md5(text.encode("utf-8")).hexdigest()
 
 
@@ -33,60 +33,112 @@ db.execute("INSERT INTO demo_users VALUES (?, ?, ?)",
 db.commit()
 
 
-# Simple page layout. {{ }} auto-escapes output, so the demo itself is not vulnerable to XSS while showing the SQL query.
-PAGE = """
+# Page layout using the shared static/style.css. 
+DEMO_STYLE = """
+<style>
+  .card.wide { max-width: 720px; }
+  .nav { display: flex; gap: 16px; justify-content: center; margin: 0 0 20px; font-size: 14px; }
+  .nav a { color: var(--muted); text-decoration: none; }
+  .nav a:hover { color: var(--text); }
+  .tag { display: inline-block; margin: 0 0 10px; padding: 3px 12px; font-size: 12px;
+         font-weight: 700; border-radius: 999px; }
+  .tag.before { background: var(--error-bg); color: var(--error-text); }
+  .tag.after { background: #E8F5EC; color: #1E7B3A; }
+  .center { text-align: center; }
+  h3 { margin: 22px 0 8px; font-size: 14px; }
+  pre { margin: 0; padding: 12px 14px; font-size: 13px; white-space: pre-wrap; word-break: break-all;
+        background: var(--input); border: 1px solid var(--border); border-radius: 8px; }
+  .params { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+  .result { margin: 18px 0 0; padding: 12px 14px; font-size: 15px; font-weight: 600; border-radius: 8px; }
+  .result.red { background: var(--error-bg); color: var(--error-text); }
+  .result.green { background: #E8F5EC; color: #1E7B3A; }
+  .result.orange { background: #FFF4E5; color: #9A5B00; }
+  .result.black { background: var(--input); color: var(--text); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .links { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .links a { margin-top: 8px; }
+</style>
+"""
+
+HEAD = """
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>SQLi Demo</title></head>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQLi Demo</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+""" + DEMO_STYLE + "</head>"
+
+PAGE = HEAD + """
 <body>
-  <p><a href="/">Home</a> | <a href="/users">View all users</a></p>
-  <h1>{{ title }}</h1>
+<main class="card wide">
+  <div class="nav"><a href="/">Home</a><a href="/users">View all users</a></div>
+  <div class="center">
+    {% if 'BEFORE' in title %}<span class="tag before">BEFORE - Vulnerable</span>{% endif %}
+    {% if 'AFTER' in title %}<span class="tag after">AFTER - Secure</span>{% endif %}
+  </div>
+  <h1>{{ title.split(' - ')[-1] }}</h1>
+  <p class="subtitle">SQL Injection demo (local testing only)</p>
+
   {% if form %}
   <form method="POST">
-    <label>Username</label><br>
-    <input name="username" size="60"><br><br>
-    <label>Password</label><br>
-    <input name="password" type="password"><br><br>
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password">
     <button type="submit">Submit</button>
   </form>
   {% endif %}
+
   {% if query %}
     <h3>Query sent to the database:</h3>
-    <pre style="background:#eee;padding:8px">{{ query }}</pre>
+    <pre>{{ query }}</pre>
   {% endif %}
-  {% if params %}<p>Parameters (sent separately): {{ params }}</p>{% endif %}
-  {% if result %}<h3 style="color:{{ color }}">{{ result }}</h3>{% endif %}
+  {% if params %}<p class="params">Parameters (sent separately): {{ params }}</p>{% endif %}
+  {% if result %}<p class="result {{ color }}">{{ result }}</p>{% endif %}
+
   {% if rows %}
-    <table border="1" cellpadding="6">
-      <tr><th>username</th><th>role</th></tr>
-      {% for r in rows %}<tr><td>{{ r[0] }}</td><td>{{ r[1] }}</td></tr>{% endfor %}
+    <table>
+      <tr><th>Username</th><th>Role</th></tr>
+      {% for r in rows %}<tr><td>{{ r[0] }}</td><td><span class="badge">{{ r[1] }}</span></td></tr>{% endfor %}
     </table>
   {% endif %}
+</main>
+</body></html>
+"""
+
+INDEX = HEAD + """
+<body>
+<main class="card wide">
+  <h1>SQL Injection Demo</h1>
+  <p class="subtitle">Local testing only. Restart the script to reset the demo database.</p>
+  <div class="links">
+    <div>
+      <span class="tag before">BEFORE - Vulnerable</span>
+      <a class="button button-secondary" href="/vulnerable/login">Vulnerable login</a>
+      <a class="button button-secondary" href="/vulnerable/register">Vulnerable register</a>
+    </div>
+    <div>
+      <span class="tag after">AFTER - Secure</span>
+      <a class="button button-secondary" href="/secure/login">Secure login</a>
+      <a class="button button-secondary" href="/secure/register">Secure register</a>
+    </div>
+  </div>
+  <p class="footer-text"><a href="/users">View all users</a></p>
+</main>
 </body></html>
 """
 
 
 @app.route("/")
 def index():
-    return """
-    <h1>SQL Injection Demo (local only)</h1>
-    <h2>BEFORE - vulnerable</h2>
-    <ul>
-      <li><a href="/vulnerable/login">Vulnerable login</a></li>
-      <li><a href="/vulnerable/register">Vulnerable register</a></li>
-    </ul>
-    <h2>AFTER - parameterized queries</h2>
-    <ul>
-      <li><a href="/secure/login">Secure login</a></li>
-      <li><a href="/secure/register">Secure register</a></li>
-    </ul>
-    <p><a href="/users">View all users</a></p>
-    """
-
+    return render_template_string(INDEX)
 
 
 # Before: vulnerable login
-# User input is pasted directly into the SQL string, so the input can change the meaning of the query
 
+# User input is pasted directly into the SQL string, so the input can change the meaning of the query.
 # Attack: username =  admin' --   password = anything
 @app.route("/vulnerable/login", methods=["GET", "POST"])
 def vulnerable_login():
@@ -118,10 +170,12 @@ def vulnerable_login():
                                   query=query, result=result, color=color)
 
 
-# Before: vulnerable register 
-# creates an admin account with password "password"
+# Before: vulnerable register
 
-# username =  hacker', '5f4dcc3b5aa765d61d8327deb882cf99', 'admin') -- password = anything
+
+# Attack (creates an ADMIN account with password "password"):
+# username =  hacker', '5f4dcc3b5aa765d61d8327deb882cf99', 'admin') --
+# password = anything
 @app.route("/vulnerable/register", methods=["GET", "POST"])
 def vulnerable_register():
     if request.method == "GET":
@@ -130,7 +184,7 @@ def vulnerable_register():
     username = request.form.get("username", "")
     password = request.form.get("password", "")
 
-    # vulnerable: string formatting builds the query
+    # VULNERABLE: string formatting builds the query
     query = (
         "INSERT INTO demo_users (username, password_hash, role) "
         f"VALUES ('{username}', '{md5(password)}', 'user')"
@@ -148,6 +202,7 @@ def vulnerable_register():
 
 
 # After: secure login with a parameterized query
+# The ? placeholders keep data separate from the SQL command.
 
 @app.route("/secure/login", methods=["GET", "POST"])
 def secure_login():
@@ -157,7 +212,6 @@ def secure_login():
     username = request.form.get("username", "")
     password = request.form.get("password", "")
 
-    # The ? placeholders keep data separate from the SQL command
     query = ("SELECT username, role FROM demo_users "
              "WHERE username = ? AND password_hash = ?")
     params = (username, md5(password))
@@ -173,8 +227,8 @@ def secure_login():
                                   query=query, params=params, result=result, color=color)
 
 
-# AFTER: secure register with a parameterized query
 
+# After: secure register with a parameterized query
 @app.route("/secure/register", methods=["GET", "POST"])
 def secure_register():
     if request.method == "GET":
@@ -207,4 +261,4 @@ def users():
 
 if __name__ == "__main__":
     # Local demonstration only - never deploy this file
-    app.run(host="127.0.0.1", port=5002, debug=False, threaded=False)
+    app.run(host="127.0.0.1", port=5002, debug=False, threaded=True)
