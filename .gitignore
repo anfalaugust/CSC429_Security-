@@ -8,3 +8,6 @@
 # Python temporary files
 __pycache__/
 *.pyc
+
+# Local TLS certificate and private key (Student 4)
+certs/

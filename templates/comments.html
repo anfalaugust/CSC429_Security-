@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="wide-card">
+        <h1>Community Comments</h1>
+        <p class="subtitle">Share a comment with other signed-in users.</p>
+
+        {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+        <form method="POST" action="{{ url_for('comments') }}">
+            <label for="comment">Your comment</label>
+            <textarea id="comment" name="comment" rows="4" maxlength="1000"
+                      placeholder="Write a comment (maximum 1000 characters)" required></textarea>
+            <button type="submit">Post Comment</button>
+        </form>
+
+        <h2 class="section-heading">Recent comments</h2>
+        {% if comments %}
+            <div class="comment-list">
+                {% for comment in comments %}
+                    <article class="comment-item">
+                        <div class="comment-meta">
+                            <strong>{{ comment.username }}</strong>
+                            <span>{{ comment.created_at }}</span>
+                        </div>
+                        <!-- Do not use |safe: Jinja auto-escapes untrusted comment text. -->
+                        <p class="comment-text">{{ comment.comment_text }}</p>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">No comments yet. Be the first to comment.</p>
+        {% endif %}
+
+        <a class="button button-secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    </main>
+</body>
+</html>

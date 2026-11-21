@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - User Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="wide-card">
+        <h1>Admin Dashboard</h1>
+        <p class="subtitle">User management — administrator access only.</p>
+
+        <div class="table-wrap">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td><span class="badge">{{ user.role }}</span></td>
+                            <td>{{ user.created_at }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4" class="empty-state">No users found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a class="button button-secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    </main>
+</body>
+</html>
